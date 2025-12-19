@@ -20,14 +20,14 @@ function normalizeText(v: unknown) {
 }
 
 function normalizePhone(v: string) {
-  // оставляем только + и цифры
+
   return v.replace(/[^\d+]/g, "").replace(/\s+/g, "").trim();
 }
 
-// ✅ строго 13 символов: "+375" + 9 цифр = 13
+// строго 13 символов: "+375" + 9 цифр = 13
 function isValidPhone(v: string) {
   const p = normalizePhone(v);
-  if (!p) return true; // телефон можно оставить пустым (оставил как у тебя)
+  if (!p) return true; 
   return /^\+375\d{9}$/.test(p);
 }
 
@@ -192,7 +192,7 @@ export default function AccountScreen() {
             keyboardType="phone-pad"
             placeholder="+375291234567"
             style={styles.input}
-            maxLength={13} // ✅ чтобы физически не дать ввести длиннее
+            maxLength={13}
           />
 
           {validationErrors.length > 0 && (
@@ -205,7 +205,6 @@ export default function AccountScreen() {
             </View>
           )}
 
-          {!isDirty && <Text style={{ marginTop: 10, opacity: 0.65 }}>Нет изменений</Text>}
 
           <Pressable
             onPress={onSave}
@@ -238,7 +237,7 @@ export default function AccountScreen() {
 }
 
 const styles = StyleSheet.create({
-  page: { flexGrow: 1, padding: 20, justifyContent: "center" },
+  page: { flexGrow: 1, padding: 20, justifyContent: "center", marginTop: 40 },
   card: {
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.08)",

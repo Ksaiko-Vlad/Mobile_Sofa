@@ -2,14 +2,14 @@ import { apiFetch } from "@/lib/api";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -37,6 +37,7 @@ type DraftItem = {
   title: string;
   unit_price: number;
   quantity: number;
+  is_from_shop_stock: boolean;
 };
 
 const toNum = (v: any, def = 0) => {
@@ -51,7 +52,6 @@ const normalizePhone = (v: string) => {
   const raw = String(v ?? "");
   const digits = raw.replace(/[^\d]/g, ""); // только цифры
 
-  // если пользователь пишет "375..." без плюса — поможем и добавим "+"
   const startsWith375 = digits.startsWith("375");
   const hasPlus = raw.trim().startsWith("+") || startsWith375;
 
@@ -69,7 +69,7 @@ const isValidPhone = (v: string) => {
 
 const isValidEmail = (v: string) => {
   const e = trim(v);
-  if (!e) return false; // email необязательный
+  if (!e) return false; // email обязателен
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
 };
 
@@ -348,6 +348,7 @@ export default function ManagerOrderCreate() {
           } • ${selectedVariant.sku}`,
           unit_price: Number(selectedVariant.price ?? 0),
           quantity: 1,
+          is_from_shop_stock: false, // по умолчанию "под заказ"
         },
       ];
     });
@@ -360,6 +361,16 @@ export default function ManagerOrderCreate() {
     setItems((prev) =>
       prev.map((i) =>
         i.product_variant_id === variantId ? { ...i, quantity: q } : i
+      )
+    );
+  }
+
+  function toggleFromStock(variantId: number) {
+    setItems((prev) =>
+      prev.map((i) =>
+        i.product_variant_id === variantId
+          ? { ...i, is_from_shop_stock: !i.is_from_shop_stock }
+          : i
       )
     );
   }
@@ -391,21 +402,22 @@ export default function ManagerOrderCreate() {
     }
 
     if (!isValidPhone(phone)) {
-      errors.push("Телефон: строго +375XXXXXXXXX (13 символов), пример: +375291234567");
+      errors.push(
+        "Телефон: строго +375XXXXXXXXX (13 символов), пример: +375291234567"
+      );
       invalid.add("phone");
     }
 
     if (!trim(email)) {
-        errors.push("Email обязателен");
-        invalid.add("email");
-      } else if (!isValidEmail(email)) {
-        errors.push("Email: неверный формат");
-        invalid.add("email");
-      }
+      errors.push("Email обязателен");
+      invalid.add("email");
+    } else if (!isValidEmail(email)) {
+      errors.push("Email: неверный формат");
+      invalid.add("email");
+    }
 
     if (items.length === 0) {
       errors.push("Добавь хотя бы один товар");
-      // items не подсвечиваем рамкой — это блок, не инпут
     }
 
     if (deliveryType === "pickup") {
@@ -502,6 +514,8 @@ export default function ManagerOrderCreate() {
       items: items.map((i) => ({
         product_variant_id: Number(i.product_variant_id),
         quantity: Number(i.quantity),
+        // Явно приводим к boolean, чтобы не было сюрпризов
+        is_from_shop_stock: i.is_from_shop_stock === true,
       })),
     };
 
@@ -524,7 +538,9 @@ export default function ManagerOrderCreate() {
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <View
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
           <ActivityIndicator />
         </View>
       </SafeAreaView>
@@ -551,7 +567,23 @@ export default function ManagerOrderCreate() {
         />
 
         <TextInput
-          placeholder="Телефон (пример: +375291234567)"
+          placeholder="Отчество"
+          value={customer.second_name}
+          onChangeText={(v) => setCustomer((p) => ({ ...p, second_name: v }))}
+          onBlur={() => touch("second_name")}
+          style={inputStyle("second_name")}
+        />
+
+        <TextInput
+          placeholder="Фамилия"
+          value={customer.last_name}
+          onChangeText={(v) => setCustomer((p) => ({ ...p, last_name: v }))}
+          onBlur={() => touch("last_name")}
+          style={inputStyle("last_name")}
+        />
+
+        <TextInput
+          placeholder="Телефон"
           value={customer.phone}
           onChangeText={(v) =>
             setCustomer((p) => ({ ...p, phone: normalizePhone(v) }))
@@ -563,7 +595,7 @@ export default function ManagerOrderCreate() {
         />
 
         <TextInput
-          placeholder="Email (необязательно)"
+          placeholder="Email"
           value={customer.email}
           onChangeText={(v) => setCustomer((p) => ({ ...p, email: v }))}
           onBlur={() => touch("email")}
@@ -622,7 +654,7 @@ export default function ManagerOrderCreate() {
 
         {deliveryType === "pickup" ? (
           <>
-            <Text style={{ marginTop: 8, opacity: 0.8 }}>Магазин:</Text>
+            <Text style={{ marginTop: 8, opacity: 0.8 }}>Магазины:</Text>
 
             {shops.map((sh) => {
               const isSelected = shopId === sh.id;
@@ -746,13 +778,56 @@ export default function ManagerOrderCreate() {
             {items.map((it) => (
               <View key={it.product_variant_id} style={{ marginBottom: 10 }}>
                 <Text style={{ fontWeight: "800" }}>{it.title}</Text>
-                <View
-                  style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}
+
+                {/* чекбокс Со склада / Под заказ */}
+                <Pressable
+                  onPress={() => toggleFromStock(it.product_variant_id)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginTop: 6,
+                    marginBottom: 2,
+                  }}
                 >
-                  <Text style={{ marginRight: 10 }}>Цена: {it.unit_price} BYN</Text>
+                  <View
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: "rgba(0,0,0,0.4)",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginRight: 6,
+                      backgroundColor: it.is_from_shop_stock
+                        ? "#111"
+                        : "transparent",
+                    }}
+                  >
+                    {it.is_from_shop_stock && (
+                      <Text style={{ color: "#fff", fontSize: 12 }}>✓</Text>
+                    )}
+                  </View>
+                  <Text style={{ fontSize: 13 }}>
+                    {it.is_from_shop_stock ? "С магазина" : "Под заказ"}
+                  </Text>
+                </Pressable>
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginTop: 4,
+                  }}
+                >
+                  <Text style={{ marginRight: 10 }}>
+                    Цена: {it.unit_price} BYN
+                  </Text>
                   <TextInput
                     value={String(it.quantity)}
-                    onChangeText={(v) => setQty(it.product_variant_id, Number(v))}
+                    onChangeText={(v) =>
+                      setQty(it.product_variant_id, Number(v))
+                    }
                     keyboardType="numeric"
                     style={{
                       width: 70,
@@ -802,7 +877,9 @@ export default function ManagerOrderCreate() {
             opacity: canSubmit ? 1 : 0.5,
           }}
         >
-          <Text style={{ color: "#fff", fontWeight: "900", textAlign: "center" }}>
+          <Text
+            style={{ color: "#fff", fontWeight: "900", textAlign: "center" }}
+          >
             {saving ? "Создаём…" : "Создать заказ"}
           </Text>
         </Pressable>

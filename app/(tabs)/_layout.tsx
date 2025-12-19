@@ -1,11 +1,10 @@
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Redirect, Tabs } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
-
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 
 type Role = "customer" | "manager" | "driver" | "factory_worker" | "admin";
 type StoredUser = { role?: Role } | null;
@@ -25,6 +24,8 @@ export default function TabLayout() {
   const [ready, setReady] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [isManager, setIsManager] = useState(false);
+  const [isFactoryWorker, setIsFactoryWorker] = useState(false);
+  const [isDriver, setIsDriver] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -42,6 +43,8 @@ export default function TabLayout() {
         if (!alive) return;
         setToken(t);
         setIsManager(role === "manager" || role === "admin");
+        setIsFactoryWorker(role === "factory_worker" || role === "admin");
+        setIsDriver(role === "driver" || role === "admin");
       } finally {
         if (alive) setReady(true);
       }
@@ -71,22 +74,36 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
       }}
     >
+
       <Tabs.Screen
-        name="index"
+        name="driver"
         options={{
-          title: "Каталог",
+          title: "Водитель",
+          href: isDriver ? undefined : null, // Скрываем если не driver
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="house.fill" color={color} />
+            <IconSymbol size={26} name="car.fill" color={color} />
           ),
         }}
       />
 
       <Tabs.Screen
-        name="explore"
+        name="factory_worker"
         options={{
-          title: "Корзина",
+          title: 'Производство',
+          href: isFactoryWorker ? undefined : null, // Скрываем если не factory_worker
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="paperplane.fill" color={color} />
+            <IconSymbol size={26} name="gearshape.fill" color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="manager"
+        options={{
+          title: "Менеджер",
+          href: isManager ? undefined : null, // Скрываем если не manager
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={26} name="briefcase.fill" color={color} />
           ),
         }}
       />
@@ -101,16 +118,6 @@ export default function TabLayout() {
         }}
       />
 
-      <Tabs.Screen
-        name="manager"
-        options={{
-          title: "Менеджер",
-          href: isManager ? undefined : null, 
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="cart.fill" color={color} />
-          ),
-        }}
-      />
     </Tabs>
   );
 }
